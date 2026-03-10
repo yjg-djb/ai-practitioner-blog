@@ -1,0 +1,17 @@
+{
+  "name": "杨金果的个人简介",
+  "short_name": "杨金果",
+  "description": "杨金果的个人简介，聚焦大模型研发、AI Agent、项目经历与技术能力。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
