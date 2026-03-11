@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -76,21 +77,61 @@ async function proxyRequest(request, response, requestUrl) {
 
   const upstreamPath = requestUrl.pathname.slice(proxyBasePath.length) || '/';
   const upstreamUrl = new URL(`/v1${upstreamPath}${requestUrl.search}`, `${upstreamBaseUrl}/`);
-  const body = await readRequestBody(request);
+  const abortController = new AbortController();
+  const abortUpstreamRequest = () => {
+    if (!abortController.signal.aborted) {
+      abortController.abort();
+    }
+  };
 
-  const upstreamResponse = await fetch(upstreamUrl, {
-    method: request.method,
-    headers: buildProxyHeaders(request.headers, upstreamApiKey),
-    body: shouldSendBody(request.method) ? body : undefined,
-  });
+  request.once('aborted', abortUpstreamRequest);
+  response.once('close', abortUpstreamRequest);
 
-  const buffer = Buffer.from(await upstreamResponse.arrayBuffer());
-  const responseHeaders = new Headers(upstreamResponse.headers);
-  responseHeaders.delete('content-length');
-  responseHeaders.delete('transfer-encoding');
+  try {
+    const body = await readRequestBody(request);
+    const upstreamResponse = await fetch(upstreamUrl, {
+      method: request.method,
+      headers: buildProxyHeaders(request.headers, upstreamApiKey),
+      body: shouldSendBody(request.method) ? body : undefined,
+      signal: abortController.signal,
+    });
 
-  response.writeHead(upstreamResponse.status, Object.fromEntries(responseHeaders.entries()));
-  response.end(buffer);
+    const responseHeaders = new Headers(upstreamResponse.headers);
+    const contentType = (upstreamResponse.headers.get('content-type') || '').toLowerCase();
+    responseHeaders.delete('content-length');
+    responseHeaders.delete('transfer-encoding');
+    responseHeaders.delete('connection');
+
+    if (contentType.includes('text/event-stream')) {
+      responseHeaders.set('cache-control', 'no-cache');
+      responseHeaders.set('x-accel-buffering', 'no');
+    }
+
+    response.writeHead(upstreamResponse.status, Object.fromEntries(responseHeaders.entries()));
+    response.flushHeaders?.();
+
+    if (!upstreamResponse.body) {
+      response.end();
+      return;
+    }
+
+    await pipeResponseBody(upstreamResponse.body, response, abortController);
+  } catch (error) {
+    if (abortController.signal.aborted || response.destroyed) {
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : 'Unexpected proxy error';
+
+    if (!response.headersSent) {
+      return sendJson(response, 502, { error: message });
+    }
+
+    response.destroy(error instanceof Error ? error : new Error(String(error)));
+  } finally {
+    request.off('aborted', abortUpstreamRequest);
+    response.off('close', abortUpstreamRequest);
+  }
 }
 
 async function serveStaticAsset(response, pathname) {
@@ -231,6 +272,36 @@ async function readRequestBody(request) {
   }
 
   return Buffer.concat(chunks);
+}
+
+async function pipeResponseBody(body, response, abortController) {
+  const reader = body.getReader();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      if (abortController.signal.aborted || response.destroyed) {
+        return;
+      }
+
+      if (!value || value.length === 0) {
+        continue;
+      }
+
+      if (!response.write(Buffer.from(value))) {
+        await once(response, 'drain');
+      }
+    }
+
+    response.end();
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function shouldSendBody(method) {

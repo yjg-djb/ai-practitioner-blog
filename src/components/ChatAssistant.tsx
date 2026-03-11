@@ -1,18 +1,37 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Send, Loader2, User } from 'lucide-react';
 import { CHAT_INITIAL_MESSAGE, CHAT_SYSTEM_PROMPT } from '../prompts/chatPromptTemplate';
 
+type MessageRole = 'user' | 'assistant';
+type MessageStatus = 'done' | 'streaming' | 'error';
+
 type Message = {
-  role: 'user' | 'assistant';
+  id: string;
+  role: MessageRole;
   content: string;
+  status: MessageStatus;
 };
+
+type ChatCompletionContent = string | Array<{ type?: string; text?: string }>;
 
 type ChatCompletionResponse = {
   choices?: Array<{
     message?: {
-      content?: string | Array<{ type?: string; text?: string }>;
+      content?: ChatCompletionContent;
     };
+  }>;
+  error?: {
+    message?: string;
+  };
+};
+
+type ChatCompletionChunk = {
+  choices?: Array<{
+    delta?: {
+      content?: ChatCompletionContent;
+    };
+    finish_reason?: string | null;
   }>;
   error?: {
     message?: string;
@@ -30,6 +49,8 @@ const DEFAULT_MODELS = [
   'MiniMax-M2.5',
 ];
 
+const STREAM_INTERRUPTED_SUFFIX = '\n\n[输出中断]';
+
 const configuredModels = (import.meta.env.VITE_OPENAI_AVAILABLE_MODELS || '')
   .split(',')
   .map((model) => model.trim())
@@ -42,53 +63,128 @@ const fallbackModel = availableModels.includes(configuredDefaultModel)
   : availableModels[0];
 const apiBasePath = (import.meta.env.VITE_OPENAI_API_BASE || '/api/openai').trim().replace(/\/+$/, '');
 
-function extractAssistantText(payload: ChatCompletionResponse): string {
-  const content = payload.choices?.[0]?.message?.content;
-
+function extractTextContent(content: ChatCompletionContent | undefined, trim = true): string {
   if (typeof content === 'string') {
-    return content.trim();
+    return trim ? content.trim() : content;
   }
 
   if (Array.isArray(content)) {
-    return content
+    const combined = content
       .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-      .join('\n')
-      .trim();
+      .join('');
+
+    return trim ? combined.trim() : combined;
   }
 
   return '';
 }
 
+function extractAssistantText(payload: ChatCompletionResponse): string {
+  return extractTextContent(payload.choices?.[0]?.message?.content);
+}
+
+function extractDeltaText(payload: ChatCompletionChunk): string {
+  return extractTextContent(payload.choices?.[0]?.delta?.content, false);
+}
+
+function createMessage(id: string, role: MessageRole, content: string, status: MessageStatus): Message {
+  return { id, role, content, status };
+}
+
+function isStreamResponse(response: Response): boolean {
+  return (response.headers.get('content-type') || '').toLowerCase().includes('text/event-stream');
+}
+
+function splitSseEvents(buffer: string, flush = false): { events: string[]; remaining: string } {
+  const normalized = buffer.replace(/\r\n/g, '\n');
+  const parts = normalized.split('\n\n');
+
+  if (flush) {
+    return {
+      events: parts.map((part) => part.trim()).filter(Boolean),
+      remaining: '',
+    };
+  }
+
+  return {
+    events: parts
+      .slice(0, -1)
+      .map((part) => part.trim())
+      .filter(Boolean),
+    remaining: parts.at(-1) ?? '',
+  };
+}
+
+function extractSseData(event: string): string | null {
+  const dataLines = event
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trimStart());
+
+  if (dataLines.length === 0) {
+    return null;
+  }
+
+  return dataLines.join('\n').trim();
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+
+  if (contentType.includes('application/json')) {
+    const payload = (await response.json()) as ChatCompletionResponse | ChatCompletionChunk;
+    return payload.error?.message || `请求失败：${response.status}`;
+  }
+
+  const text = await response.text();
+  return text.trim() || `请求失败：${response.status}`;
+}
+
 export default function ChatAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: CHAT_INITIAL_MESSAGE },
+    createMessage('assistant-initial', 'assistant', CHAT_INITIAL_MESSAGE, 'done'),
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(fallbackModel);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageCounterRef = useRef(0);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  const createMessageId = () => {
+    messageCounterRef.current += 1;
+    return `message-${messageCounterRef.current}`;
+  };
+
+  const updateMessage = (messageId: string, updater: (message: Message) => Message) => {
+    setMessages((prev) => prev.map((message) => (message.id === messageId ? updater(message) : message)));
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) {
       return;
     }
 
-    const userMessage = input.trim();
-    const conversation = [...messages, { role: 'user' as const, content: userMessage }];
+    const userMessage = createMessage(createMessageId(), 'user', input.trim(), 'done');
+    const assistantMessage = createMessage(createMessageId(), 'assistant', '', 'streaming');
+    const conversation = [...messages, userMessage];
 
     setInput('');
-    setMessages(conversation);
+    setMessages([...conversation, assistantMessage]);
     setIsLoading(true);
+
+    let assistantText = '';
+    let receivedAnyToken = false;
 
     try {
       const response = await fetch(`${apiBasePath}/chat/completions`, {
         method: 'POST',
         headers: {
+          Accept: 'text/event-stream, application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -101,27 +197,102 @@ export default function ChatAssistant() {
             })),
           ],
           temperature: 0.7,
-          stream: false,
+          stream: true,
         }),
       });
 
-      const payload = (await response.json()) as ChatCompletionResponse;
-
       if (!response.ok) {
-        throw new Error(payload.error?.message || `请求失败：${response.status}`);
+        throw new Error(await readErrorMessage(response));
       }
 
-      const assistantText = extractAssistantText(payload) || '模型没有返回可显示的内容。';
-      setMessages((prev) => [...prev, { role: 'assistant', content: assistantText }]);
+      if (isStreamResponse(response) && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let streamFinished = false;
+
+        const applyAssistantText = (nextText: string, status: MessageStatus) => {
+          updateMessage(assistantMessage.id, (message) => ({
+            ...message,
+            content: nextText,
+            status,
+          }));
+        };
+
+        const processEvents = (events: string[]) => {
+          for (const event of events) {
+            const data = extractSseData(event);
+
+            if (!data) {
+              continue;
+            }
+
+            if (data === '[DONE]') {
+              streamFinished = true;
+              break;
+            }
+
+            const payload = JSON.parse(data) as ChatCompletionChunk;
+
+            if (payload.error?.message) {
+              throw new Error(payload.error.message);
+            }
+
+            const deltaText = extractDeltaText(payload);
+
+            if (!deltaText) {
+              continue;
+            }
+
+            assistantText += deltaText;
+            receivedAnyToken = true;
+            applyAssistantText(assistantText, 'streaming');
+          }
+        };
+
+        while (!streamFinished) {
+          const { done, value } = await reader.read();
+
+          buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+          const parsed = splitSseEvents(buffer, done);
+          buffer = parsed.remaining;
+          processEvents(parsed.events);
+
+          if (done) {
+            break;
+          }
+        }
+      } else {
+        const payload = (await response.json()) as ChatCompletionResponse;
+        assistantText = extractAssistantText(payload);
+        receivedAnyToken = assistantText.length > 0;
+      }
+
+      const finalText = assistantText || '模型没有返回可显示的内容。';
+      updateMessage(assistantMessage.id, (message) => ({
+        ...message,
+        content: finalText,
+        status: 'done',
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误';
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `调用模型服务失败：${message}`,
-        },
-      ]);
+
+      updateMessage(assistantMessage.id, (currentMessage) => {
+        if (!receivedAnyToken) {
+          return {
+            ...currentMessage,
+            content: `调用模型服务失败：${message}`,
+            status: 'error',
+          };
+        }
+
+        return {
+          ...currentMessage,
+          content: `${assistantText}${STREAM_INTERRUPTED_SUFFIX}`,
+          status: 'error',
+        };
+      });
     } finally {
       setIsLoading(false);
     }
@@ -205,9 +376,9 @@ export default function ChatAssistant() {
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              {messages.map((message, index) => (
+              {messages.map((message) => (
                 <div
-                  key={`${message.role}-${index}`}
+                  key={message.id}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`flex max-w-[85%] gap-3 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -229,27 +400,23 @@ export default function ChatAssistant() {
                           : 'rounded-tl-sm bg-black/5 text-black/90 dark:bg-white/10 dark:text-white/90'
                       }`}
                     >
-                      {message.content}
+                      <span className="whitespace-pre-wrap break-words">{message.content}</span>
+                      {message.role === 'assistant' && message.status === 'streaming' && (
+                        <span className="ml-1 inline-flex items-center gap-1 align-middle text-black/45 dark:text-white/45">
+                          {message.content ? (
+                            <span className="inline-block h-4 w-px animate-pulse bg-black/45 dark:bg-white/45" />
+                          ) : (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span className="text-xs">模型思考中...</span>
+                            </>
+                          )}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
               ))}
-
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="flex max-w-[85%] gap-3">
-                    <div className="mt-1 shrink-0">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white dark:bg-white dark:text-black">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm bg-black/5 p-4 text-black/90 dark:bg-white/10 dark:text-white/90">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-xs">模型思考中...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div ref={messagesEndRef} />
             </div>
@@ -284,4 +451,3 @@ export default function ChatAssistant() {
     </>
   );
 }
-
