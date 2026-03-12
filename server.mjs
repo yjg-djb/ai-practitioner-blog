@@ -4,6 +4,13 @@ import { readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  buildAbsoluteUrl,
+  buildStructuredData,
+  getRouteInfo,
+  getSitemapEntries,
+  normalizeSiteUrl,
+} from './src/content/siteContent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,11 +42,16 @@ const mimeTypes = new Map([
   ['.js', 'application/javascript; charset=utf-8'],
   ['.json', 'application/json; charset=utf-8'],
   ['.map', 'application/json; charset=utf-8'],
+  ['.pdf', 'application/pdf'],
   ['.png', 'image/png'],
   ['.svg', 'image/svg+xml'],
   ['.txt', 'text/plain; charset=utf-8'],
+  ['.webmanifest', 'application/manifest+json; charset=utf-8'],
   ['.webp', 'image/webp'],
+  ['.xml', 'application/xml; charset=utf-8'],
 ]);
+
+let appHtmlTemplate = null;
 
 const server = createServer(async (request, response) => {
   try {
@@ -53,11 +65,23 @@ const server = createServer(async (request, response) => {
       });
     }
 
+    if (requestUrl.pathname === '/robots.txt') {
+      return sendText(response, 200, renderRobotsTxt(resolveSiteUrl(request)), 'text/plain; charset=utf-8');
+    }
+
+    if (requestUrl.pathname === '/sitemap.xml') {
+      return sendText(response, 200, renderSitemapXml(resolveSiteUrl(request)), 'application/xml; charset=utf-8');
+    }
+
     if (requestUrl.pathname === proxyBasePath || requestUrl.pathname.startsWith(`${proxyBasePath}/`)) {
       return proxyRequest(request, response, requestUrl);
     }
 
-    return serveStaticAsset(response, requestUrl.pathname);
+    if (hasFileExtension(requestUrl.pathname)) {
+      return serveStaticAsset(response, requestUrl.pathname);
+    }
+
+    return serveAppDocument(request, response, requestUrl.pathname);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected server error';
     return sendJson(response, 500, { error: message });
@@ -135,30 +159,11 @@ async function proxyRequest(request, response, requestUrl) {
 }
 
 async function serveStaticAsset(response, pathname) {
-  let relativePath = decodeURIComponent(pathname);
-
-  if (relativePath === '/') {
-    relativePath = '/index.html';
-  }
-
-  const normalizedPath = path
-    .normalize(relativePath)
-    .replace(/^(\.\.(\/|\\|$))+/, '')
-    .replace(/^([/\\])+/, '');
-  let filePath = path.join(distDir, normalizedPath);
+  const normalizedPath = sanitizeAssetPath(pathname);
+  const filePath = path.join(distDir, normalizedPath);
 
   if (!(await isFile(filePath))) {
-    if (path.extname(normalizedPath)) {
-      return sendJson(response, 404, { error: 'Asset not found.' });
-    }
-
-    filePath = path.join(distDir, 'index.html');
-  }
-
-  if (!(await isFile(filePath))) {
-    return sendJson(response, 500, {
-      error: 'dist directory is missing. Run npm run build before starting the server.',
-    });
+    return sendJson(response, 404, { error: 'Asset not found.' });
   }
 
   const extension = path.extname(filePath).toLowerCase();
@@ -172,6 +177,39 @@ async function serveStaticAsset(response, pathname) {
     'Content-Type': contentType,
   });
   response.end(content);
+}
+
+async function serveAppDocument(request, response, pathname) {
+  const indexPath = path.join(distDir, 'index.html');
+
+  if (!(await isFile(indexPath))) {
+    return sendJson(response, 500, {
+      error: 'dist directory is missing. Run npm run build before starting the server.',
+    });
+  }
+
+  if (!appHtmlTemplate) {
+    appHtmlTemplate = await readFile(indexPath, 'utf8');
+  }
+
+  const route = getRouteInfo(pathname);
+  const siteUrl = resolveSiteUrl(request);
+  const canonical = buildAbsoluteUrl(route.seo.path, siteUrl);
+  const image = buildAbsoluteUrl(route.seo.image, siteUrl);
+  const structuredData = JSON.stringify(buildStructuredData(route, siteUrl)).replace(/</g, '\\u003c');
+  const html = appHtmlTemplate
+    .replaceAll('__SEO_TITLE__', escapeHtml(route.seo.title))
+    .replaceAll('__SEO_DESCRIPTION__', escapeHtml(route.seo.description))
+    .replaceAll('__SEO_CANONICAL__', escapeHtml(canonical))
+    .replaceAll('__SEO_OG_IMAGE__', escapeHtml(image))
+    .replaceAll('__SEO_OG_TYPE__', escapeHtml(route.seo.type))
+    .replaceAll('__SEO_JSON_LD__', structuredData);
+
+  response.writeHead(route.kind === 'notFound' ? 404 : 200, {
+    'Cache-Control': 'no-cache',
+    'Content-Type': 'text/html; charset=utf-8',
+  });
+  response.end(html);
 }
 
 function buildProxyHeaders(headers, apiKey) {
@@ -313,4 +351,83 @@ function sendJson(response, statusCode, payload) {
     'Content-Type': 'application/json; charset=utf-8',
   });
   response.end(JSON.stringify(payload));
+}
+
+function sendText(response, statusCode, body, contentType) {
+  response.writeHead(statusCode, {
+    'Cache-Control': 'no-cache',
+    'Content-Type': contentType,
+  });
+  response.end(body);
+}
+
+function hasFileExtension(pathname) {
+  return path.extname(pathname) !== '';
+}
+
+function sanitizeAssetPath(pathname) {
+  return path
+    .normalize(decodeURIComponent(pathname))
+    .replace(/^(\.\.(\/|\\|$))+/, '')
+    .replace(/^([/\\])+/, '');
+}
+
+function escapeHtml(value) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function resolveSiteUrl(request) {
+  const configured = (process.env.APP_URL || process.env.SITE_URL || '').trim();
+
+  if (configured) {
+    const withProtocol = /^https?:\/\//i.test(configured) ? configured : `https://${configured}`;
+    return normalizeSiteUrl(withProtocol);
+  }
+
+  const forwardedProto = getFirstHeaderValue(request.headers['x-forwarded-proto']) || 'http';
+  const forwardedHost = getFirstHeaderValue(request.headers['x-forwarded-host']);
+  const hostHeader = forwardedHost || request.headers.host || `localhost:${port}`;
+  return normalizeSiteUrl(`${forwardedProto}://${hostHeader}`);
+}
+
+function getFirstHeaderValue(value) {
+  if (!value) {
+    return '';
+  }
+
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+
+  return value.split(',')[0].trim();
+}
+
+function renderRobotsTxt(siteUrl) {
+  return `User-agent: *\nAllow: /\nSitemap: ${buildAbsoluteUrl('/sitemap.xml', siteUrl)}\n`;
+}
+
+function renderSitemapXml(siteUrl) {
+  const urls = getSitemapEntries()
+    .map(
+      (entry) =>
+        `<url><loc>${escapeXml(buildAbsoluteUrl(entry.path, siteUrl))}</loc><lastmod>${entry.lastModified}</lastmod></url>`,
+    )
+    .join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`;
+}
+
+function escapeXml(value) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }

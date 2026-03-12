@@ -1,36 +1,159 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Noto+Serif+SC:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500&display=swap');
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", "Noto Serif SC", "Songti SC", ui-serif, Georgia, serif;
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-serif: "Iowan Old Style", "Source Han Serif SC", "Songti SC", "Noto Serif SC", serif;
 }
 
 :root {
-  --hover-glow: rgba(0, 0, 0, 0.05);
+  color-scheme: light;
+  --ink: #1b1a18;
+  --paper: #f6f3ee;
+  --accent: #7a5b2b;
+  --accent-soft: #d9ba78;
 }
 
 .dark {
-  --hover-glow: rgba(255, 255, 255, 0.08);
+  color-scheme: dark;
+  --ink: #f5f3ee;
+  --paper: #0c0d0e;
+  --accent: #d9ba78;
+  --accent-soft: #f0d9a0;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  @apply bg-[#f5f5f5] text-[#1a1a1a] dark:bg-[#050505] dark:text-[#ffffff] transition-colors duration-300;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  color: var(--ink);
+  background-color: var(--paper);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif);
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  outline-offset: 3px;
 }
 
 ::selection {
-  @apply bg-black/10 text-black dark:bg-white/20 dark:text-white;
+  background: rgba(122, 91, 43, 0.18);
+  color: #1b1a18;
 }
 
-.text-gradient {
-  @apply bg-gradient-to-r from-[#1a1a1a] to-[#737373] dark:from-[#ffffff] dark:to-[#737373];
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.dark ::selection {
+  background: rgba(217, 186, 120, 0.28);
+  color: #ffffff;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.markdown {
+  line-height: 1.6;
+  color: inherit;
+}
+
+.markdown > *:first-child {
+  margin-top: 0;
+}
+
+.markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown h2,
+.markdown h3 {
+  margin: 0.65rem 0 0.35rem;
+  font-weight: 600;
+}
+
+.markdown h2 {
+  font-size: 1.05rem;
+}
+
+.markdown h3 {
+  font-size: 0.98rem;
+}
+
+.markdown p {
+  margin: 0.4rem 0;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0.45rem 0 0.6rem;
+  padding-left: 1.2rem;
+}
+
+.markdown li {
+  margin: 0.2rem 0;
+}
+
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dark .markdown a {
+  color: var(--accent-soft);
+}
+
+.markdown-inline-code,
+.markdown-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85em;
+  background: rgba(15, 12, 8, 0.08);
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.35rem;
+}
+
+.dark .markdown-inline-code,
+.dark .markdown-code {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.markdown-pre {
+  margin: 0.6rem 0;
+  padding: 0.75rem 0.9rem;
+  background: rgba(15, 12, 8, 0.08);
+  border-radius: 0.8rem;
+  overflow-x: auto;
+}
+
+.dark .markdown-pre {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.markdown-pre code {
+  background: transparent;
+  padding: 0;
+}
+

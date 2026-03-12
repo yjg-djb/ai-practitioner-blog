@@ -40,6 +40,8 @@ The installer will:
 - install a `systemd` service
 - configure Nginx to proxy port 80 to the Node app
 
+For the full deployment and update guide, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## Production commands
 
 - Build only: `npm run build`

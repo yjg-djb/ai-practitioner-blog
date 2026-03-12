@@ -1,43 +1,43 @@
 import { Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(true);
+type ThemeToggleProps = {
+  className?: string;
+};
+
+export default function ThemeToggle({ className = '' }: ThemeToggleProps) {
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document === 'undefined') {
+      return true;
+    }
+
+    return document.documentElement.classList.contains('dark');
+  });
 
   useEffect(() => {
-    // Check initial preference
-    if (localStorage.theme === 'light' || (!('theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const nextIsDark = localStorage.theme === 'light' ? false : localStorage.theme === 'dark' || prefersDark;
+
+    document.documentElement.classList.toggle('dark', nextIsDark);
+    setIsDark(nextIsDark);
   }, []);
 
   const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      localStorage.theme = 'light';
-      setIsDark(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.theme = 'dark';
-      setIsDark(true);
-    }
+    const nextIsDark = !isDark;
+
+    document.documentElement.classList.toggle('dark', nextIsDark);
+    localStorage.theme = nextIsDark ? 'dark' : 'light';
+    setIsDark(nextIsDark);
   };
 
   return (
     <button
+      type="button"
       onClick={toggleTheme}
-      className="fixed top-6 right-6 z-50 p-3 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors backdrop-blur-md"
-      aria-label="Toggle theme"
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/70 text-black backdrop-blur-md transition-colors hover:border-black/20 hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/15 ${className}`}
+      aria-label={isDark ? '切换到浅色主题' : '切换到深色主题'}
     >
-      {isDark ? (
-        <Sun className="w-5 h-5 text-white/80" />
-      ) : (
-        <Moon className="w-5 h-5 text-black/80" />
-      )}
+      {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
     </button>
   );
 }

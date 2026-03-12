@@ -1,11 +1,11 @@
 {
-  "name": "杨金果的个人简介",
-  "short_name": "杨金果",
-  "description": "杨金果的个人简介，聚焦大模型研发、AI Agent、项目经历与技术能力。",
+  "name": "杨金果 | AI Engineer Portfolio",
+  "short_name": "杨金果作品集",
+  "description": "面向招聘方的 AI 工程师作品集，聚焦 AI Agent、RAG、模型微调与业务落地。",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f5f5",
-  "theme_color": "#111111",
+  "background_color": "#f4efe7",
+  "theme_color": "#090a0b",
   "icons": [
     {
       "src": "/favicon.svg",

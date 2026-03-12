@@ -1,0 +1,38 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0C0D0F" />
+  <rect x="26" y="26" width="1148" height="578" rx="34" stroke="url(#frame)" stroke-width="2" />
+  <path d="M0 0H1200V630H0V0Z" fill="url(#panel)" />
+  <circle cx="1002" cy="132" r="164" fill="#C8963B" fill-opacity="0.14" />
+  <circle cx="224" cy="524" r="188" fill="#E2BF7D" fill-opacity="0.12" />
+  <path d="M120 152H388V454H120V152Z" fill="url(#accentBlock)" fill-opacity="0.08" />
+  <text x="120" y="170" fill="#D8B97A" font-family="Segoe UI, PingFang SC, sans-serif" font-size="22" letter-spacing="5.2">
+    RECRUITER-FIRST AI ENGINEER PORTFOLIO
+  </text>
+  <text x="120" y="280" fill="#F8F5EE" font-family="Georgia, Source Han Serif SC, serif" font-size="74" font-weight="600">
+    杨金果
+  </text>
+  <text x="120" y="350" fill="#F8F5EE" font-family="Georgia, Source Han Serif SC, serif" font-size="54">
+    把模型能力，做成真实可交付的业务系统。
+  </text>
+  <text x="120" y="430" fill="#D0D2D6" font-family="Segoe UI, PingFang SC, sans-serif" font-size="28">
+    AI Agent / RAG / 模型微调 / 业务落地 / 智能系统工程
+  </text>
+  <text x="120" y="500" fill="#F8F5EE" font-family="Segoe UI, PingFang SC, sans-serif" font-size="22">
+    1.2 万银行员工服务规模 · 60% 人力成本下降 · 88% 医疗建议准确率
+  </text>
+  <defs>
+    <linearGradient id="frame" x1="70" y1="44" x2="1080" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.44" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.08" />
+    </linearGradient>
+    <linearGradient id="panel" x1="131" y1="34" x2="1075" y2="604" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#15171B" />
+      <stop offset="0.62" stop-color="#0B0C0E" />
+      <stop offset="1" stop-color="#171009" />
+    </linearGradient>
+    <linearGradient id="accentBlock" x1="120" y1="152" x2="388" y2="454" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E6C587" />
+      <stop offset="1" stop-color="#A16B1C" />
+    </linearGradient>
+  </defs>
+</svg>

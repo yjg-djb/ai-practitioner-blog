@@ -1,28 +1,42 @@
-import { motion } from 'motion/react';
+﻿import { profile } from '../content/siteContent.js';
+import { trackEvent } from '../lib/analytics';
 
 export default function Footer() {
   return (
-    <footer className="py-12 px-6 md:px-12 max-w-7xl mx-auto border-t border-black/10 dark:border-white/10 mt-20">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-        <motion.div 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-black/40 dark:text-white/40 text-sm font-light"
-        >
-          © {new Date().getFullYear()} 杨金果 (Yang Jinguo). 保留所有权利。
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="flex items-center gap-8 text-sm font-medium text-black/60 dark:text-white/60"
-        >
-          <a href="https://github.com/yjg-djb" target="_blank" rel="noreferrer" className="hover:text-black dark:hover:text-white transition-colors interactive">GitHub</a>
-          <a href="mailto:hsjdu9522@gmail.com" className="hover:text-black dark:hover:text-white transition-colors interactive">Email</a>
-          <span className="text-black/40 dark:text-white/40">15523408645</span>
-        </motion.div>
+    <footer className="border-t border-black/10 bg-white/50 px-6 py-8 backdrop-blur-sm dark:border-white/10 dark:bg-black/20 md:px-12">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-black/60 dark:text-white/60 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="font-medium text-black dark:text-white">
+            {profile.name} · {profile.role}
+          </div>
+          <div>面向招聘的 AI 工程作品集，强调交付闭环与量化结果。</div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <a
+            href={profile.github}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => trackEvent('contact_click', { channel: 'github_footer' })}
+            className="transition-colors hover:text-black dark:hover:text-white"
+          >
+            GitHub
+          </a>
+          <a
+            href={`mailto:${profile.email}`}
+            onClick={() => trackEvent('contact_click', { channel: 'email_footer' })}
+            className="transition-colors hover:text-black dark:hover:text-white"
+          >
+            {profile.email}
+          </a>
+          <a
+            href={`tel:${profile.phone}`}
+            onClick={() => trackEvent('contact_click', { channel: 'phone_footer' })}
+            className="transition-colors hover:text-black dark:hover:text-white"
+          >
+            {profile.phone}
+          </a>
+        </div>
       </div>
     </footer>
   );
