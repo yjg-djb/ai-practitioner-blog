@@ -4,6 +4,7 @@
 /** @typedef {import('./types').NoteEntry} NoteEntry */
 /** @typedef {import('./types').Profile} Profile */
 /** @typedef {import('./types').ProjectEntry} ProjectEntry */
+/** @typedef {import('./types').SkillEntry} SkillEntry */
 /** @typedef {import('./types').RouteInfo} RouteInfo */
 /** @typedef {import('./types').SeoMeta} SeoMeta */
 /** @typedef {import('./types').SitemapEntry} SitemapEntry */
@@ -204,6 +205,146 @@ export const profile = {
     homeUpdatedAt,
   ),
 };
+
+/** @type {SkillEntry[]} */
+export const skills = [
+  {
+    slug: 'jd-fit-report',
+    title: 'JD Fit Skill',
+    kicker: 'Live Skill',
+    status: 'live',
+    version: 'v1.0',
+    summary:
+      '输入 JD 文本或岗位链接，输出结构化匹配报告，回答“是否匹配、证据在哪、风险是什么、下一轮该追问什么”。',
+    goal:
+      '把招聘方原本需要 10 分钟人工扫简历和项目的动作压缩成 30-60 秒的预筛判断。',
+    proof:
+      '这张 Skill 直接接入当前站点内容与岗位链接抓取，并输出固定 schema，能展示能力封装、工具调用与 guardrail 设计。',
+    trigger: [
+      'HR 粘贴 JD 文本，希望快速判断岗位匹配度',
+      '面试官输入岗位链接，希望得到证据驱动的筛选报告',
+      '需要把“项目经历”翻译成“岗位胜任力”',
+    ],
+    inputs: ['岗位链接', 'JD 文本', '模型选择'],
+    tools: ['Job URL Fetcher', 'Site Content Retriever', 'Project Evidence Lookup', 'Structured JSON Validator'],
+    outputs: [
+      'summary',
+      'fit_score',
+      'score_breakdown',
+      'evidence[]',
+      'risks[]',
+      'follow_up_questions[]',
+      'recommended_projects[]',
+    ],
+    guardrails: [
+      '只允许引用站内证据，不确定就写“无法确认”',
+      '评分维度固定为 5 项，避免口径漂移',
+      '模型若返回非 JSON，会执行一次修复重试',
+    ],
+    runtimeSteps: [
+      { title: 'Input Normalize', detail: '归一化岗位链接与 JD 文本，校验最小输入约束。' },
+      { title: 'Job Fetch', detail: '尝试抓取公开职位页正文，并与粘贴文本合并。' },
+      { title: 'Evidence Build', detail: '把项目、经历、笔记整理成可引用的候选人证据目录。' },
+      { title: 'Skill Reasoning', detail: '基于固定维度生成岗位匹配判断与风险项。' },
+      { title: 'Guardrail Check', detail: '校验 JSON 结构、证据来源和项目引用是否合法。' },
+    ],
+    evals: [
+      { label: 'Latency Target', value: '< 60s', detail: '面向 HR 预筛的单次分析目标' },
+      { label: 'Output Contract', value: 'JSON', detail: '固定结构，便于二次导出与 trace' },
+      { label: 'Evidence Policy', value: '站内限定', detail: '不把未知写成优势' },
+    ],
+    relatedProjectSlugs: ['bank-ai-operations-platform', 'medical-llm-training'],
+    relatedNoteSlugs: ['rag-delivery-playbook', 'agent-delivery-checklist'],
+  },
+  {
+    slug: 'evidence-pack-generator',
+    title: 'Evidence Pack Skill',
+    kicker: 'Prototype Skill',
+    status: 'prototype',
+    version: 'v0.3',
+    summary:
+      '把“为什么适合这个岗位”整理成一页可转发的证据包，面向 HR 和技术面试官做跨角色沟通。',
+    goal:
+      '把简历、项目和笔记中的零散信息压成一份可复制、可发送、可追问的招聘材料。',
+    proof:
+      '重点展示如何把 skill 输出设计成“可交付 artifact”，而不是只返回一段聊天文本。',
+    trigger: [
+      'HR 需要把候选人亮点转发给技术面试官',
+      '用户想按“AI Agent / RAG / 训练与部署”维度提取证据',
+      '需要生成标准化 Markdown 摘要或邮件正文',
+    ],
+    inputs: ['岗位方向', '问题类型', '证据维度'],
+    tools: ['Site Content Retriever', 'Project Evidence Lookup', 'Markdown Formatter'],
+    outputs: ['一页证据摘要', '引用来源', '推荐查看项目', '补充追问建议'],
+    guardrails: [
+      '每个结论都绑定来源，不允许无来源总结',
+      '按角色分层输出：HR 可读 + 技术面试官可追问',
+      '输出长度受控，避免“文案堆砌”',
+    ],
+    runtimeSteps: [
+      { title: 'Intent Route', detail: '识别是岗位说明、项目证明还是技术能力证明。' },
+      { title: 'Evidence Select', detail: '优先提取最强的 2-3 条案例，而不是罗列全部经历。' },
+      { title: 'Artifact Compose', detail: '把内容整理成可复制的 Markdown 摘要。' },
+      { title: 'Human Review', detail: '预留人工确认后再外发，避免误转述。' },
+    ],
+    evals: [
+      { label: 'Primary Output', value: 'Markdown', detail: '适合复制到 IM / 邮件 / 面试备注' },
+      { label: 'Reading Time', value: '≈ 1 min', detail: '控制在招聘方可快速消费的长度' },
+      { label: 'Citation Density', value: 'High', detail: '每段核心结论都带来源' },
+    ],
+    relatedProjectSlugs: ['bank-ai-operations-platform'],
+    relatedNoteSlugs: ['finetune-to-product-bridge'],
+  },
+  {
+    slug: 'gap-analysis',
+    title: 'Gap Analysis Skill',
+    kicker: 'Prototype Skill',
+    status: 'prototype',
+    version: 'v0.2',
+    summary:
+      '显式指出候选人和目标岗位之间的缺口、风险和无法确认项，避免“只会放大优势”的筛选偏差。',
+    goal:
+      '让网站不只是“介绍我很强”，而是证明我会做真实的 agent guardrail 和负面判断。',
+    proof:
+      '这是最能体现工程判断的一张 Skill，因为它要求系统承认边界、输出不确定性并生成后续追问。',
+    trigger: [
+      '岗位要求偏底层推理/训练，而候选人更偏应用落地',
+      '招聘方需要知道风险点和补充材料',
+      '希望生成结构化追问清单来辅助面试',
+    ],
+    inputs: ['岗位要求', '关注维度', '已有材料范围'],
+    tools: ['Site Content Retriever', 'Risk Pattern Library', 'Question Generator'],
+    outputs: ['gap_summary', 'risks[]', 'cannot_confirm[]', 'follow_up_questions[]'],
+    guardrails: [
+      '无法确认项必须单独列出，不能混入优势描述',
+      '风险判断优先基于岗位要求和站内证据交集',
+      '输出追问要可执行，避免空泛建议',
+    ],
+    runtimeSteps: [
+      { title: 'Requirement Slice', detail: '把 JD 拆成岗位方向、系统复杂度、交付要求。' },
+      { title: 'Coverage Check', detail: '对照站内证据判断哪些点有支撑，哪些点缺失。' },
+      { title: 'Risk Surface', detail: '把缺失、模糊和潜在误判点提炼成风险清单。' },
+      { title: 'Question Draft', detail: '为 HR 和面试官分别生成下一轮追问。' },
+    ],
+    evals: [
+      { label: 'Hallucination Policy', value: 'Strict', detail: '未知必须显式保留' },
+      { label: 'Risk Recall', value: 'High', detail: '优先覆盖真实筛选风险而非修饰表达' },
+      { label: 'Interviewer Use', value: 'Strong', detail: '更适合技术一面前的预读' },
+    ],
+    relatedProjectSlugs: ['medical-llm-training', 'mobile-agent-runtime'],
+    relatedNoteSlugs: ['agent-delivery-checklist'],
+  },
+];
+
+export const featuredSkillSlugs = skills.map((skill) => skill.slug);
+export const skillsSeo = createSeoMeta(
+  'Skill Lab | 杨金果 AI Agent Skills',
+  '公开展示 JD Fit、证据包与缺口分析三类招聘场景 Skill，重点说明输入输出、工具、Guardrails、Trace 与 Eval。',
+  '/skills',
+  'website',
+  undefined,
+  homeUpdatedAt,
+);
 
 /** @type {ProjectEntry[]} */
 export const projects = [
@@ -552,6 +693,14 @@ export function getProjectBySlug(slug) {
 
 /**
  * @param {string} slug
+ * @returns {SkillEntry | undefined}
+ */
+export function getSkillBySlug(slug) {
+  return skills.find((skill) => skill.slug === slug);
+}
+
+/**
+ * @param {string} slug
  * @returns {NoteEntry | undefined}
  */
 export function getNoteBySlug(slug) {
@@ -569,6 +718,15 @@ export function getRouteInfo(pathname) {
       pathname: '/',
       seo: profile.seo,
       profile,
+    };
+  }
+
+  if (pathname === '/skills') {
+    return {
+      kind: 'skills',
+      pathname: '/skills',
+      seo: skillsSeo,
+      skills,
     };
   }
 
@@ -624,6 +782,15 @@ export function getFeaturedProjects() {
 }
 
 /**
+ * @returns {SkillEntry[]}
+ */
+export function getFeaturedSkills() {
+  return featuredSkillSlugs
+    .map((slug) => getSkillBySlug(slug))
+    .filter(Boolean);
+}
+
+/**
  * @returns {NoteEntry[]}
  */
 export function getFeaturedNotes() {
@@ -638,6 +805,7 @@ export function getFeaturedNotes() {
 export function getSitemapEntries() {
   return [
     { path: '/', lastModified: homeUpdatedAt },
+    { path: '/skills', lastModified: homeUpdatedAt },
     ...projects.map((project) => ({
       path: project.seo.path,
       lastModified: project.seo.modifiedTime || homeUpdatedAt,
@@ -712,6 +880,25 @@ export function buildStructuredData(route, siteUrl) {
     };
   }
 
+  if (route.kind === 'skills') {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Skill Lab',
+      description: route.seo.description,
+      url: buildAbsoluteUrl(route.pathname, siteUrl),
+      mainEntity: {
+        '@type': 'ItemList',
+        itemListElement: skills.map((skill, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: skill.title,
+          description: skill.summary,
+        })),
+      },
+    };
+  }
+
   if (route.kind === 'note') {
     return {
       '@context': 'https://schema.org',
@@ -762,6 +949,12 @@ Markdown output requirements:
 - Do not output raw HTML; use code blocks only if needed.
 
 Suggested headings: 岗位匹配 / 项目证据 / 指标口径
+Prefer this order when the question is substantive:
+- ### 岗位匹配
+- ### 项目证据
+- ### 指标口径
+- ### 风险与补充
+- ### 建议追问
 
 Candidate info:
 - Name: ${profile.name}
@@ -782,7 +975,7 @@ Notes:
 ${noteDigest}
 
 Response requirements:
-- Prioritize a structured answer: "Role fit + Evidence + Metric definition".
+- Prioritize a structured answer: "Role fit + Evidence + Metric definition + Risks + Follow-up questions".
 - For metrics, state "relative lift" vs "absolute value"; if unsure, mark "internal evaluation".
 - If the question is outside site info, say cannot confirm and suggest follow-up questions.
   `.trim();
@@ -790,5 +983,5 @@ Response requirements:
 
 /** @returns {string} */
 export function buildRecruiterInitialMessage() {
-  return '你好，我是招聘场景 AI 助手。可以直接问岗位匹配、项目证据或让我们做一份 3 分钟概览。';
+  return '你好，我是招聘场景 AI 助手。可以直接问岗位匹配、项目证据，或切到 JD 匹配生成一份结构化报告。';
 }

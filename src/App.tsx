@@ -7,6 +7,7 @@ import { getRouteInfo } from './content/siteContent.js';
 import { applyRouteSeo } from './lib/seo';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
+const SkillsPage = lazy(() => import('./pages/SkillsPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const NotePage = lazy(() => import('./pages/NotePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -53,6 +54,7 @@ export default function App() {
           <main id="main-content">
             <Suspense fallback={<PageFallback />}>
               {route.kind === 'home' && <HomePage />}
+              {route.kind === 'skills' && <SkillsPage />}
               {route.kind === 'project' && <ProjectPage slug={route.project.slug} />}
               {route.kind === 'note' && <NotePage slug={route.note.slug} />}
               {route.kind === 'notFound' && <NotFoundPage />}

@@ -3,14 +3,17 @@ import {
   ArrowRight,
   ArrowUpRight,
   FileDown,
+  FileSearch,
   MessageSquareText,
   NotebookPen,
+  ShieldCheck,
   Sparkles,
   Target,
 } from 'lucide-react';
 import {
   getFeaturedNotes,
   getFeaturedProjects,
+  getFeaturedSkills,
   profile,
 } from '../content/siteContent.js';
 import { openRecruiterAssistant } from '../lib/assistant';
@@ -43,6 +46,7 @@ function SectionHeader({
 export default function HomePage() {
   const featuredProjects = getFeaturedProjects();
   const featuredNotes = getFeaturedNotes();
+  const featuredSkills = getFeaturedSkills();
   const workEntries = profile.timeline.filter((entry) => entry.kind === 'work');
   const educationEntries = profile.timeline.filter((entry) => entry.kind === 'education');
 
@@ -99,8 +103,19 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => {
+                trackEvent('jd_fit_cta_click', { source: 'hero' });
+                openRecruiterAssistant('jd-fit', 'hero_jd_fit');
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-[#d9ba78]/35 bg-[#f1e7d2]/70 px-5 py-3 text-sm font-medium text-[#7a5b2b] transition-colors hover:border-[#d9ba78]/55 hover:bg-[#efe0bf] dark:border-[#d9ba78]/20 dark:bg-[#d9ba78]/10 dark:text-[#f0d9a0] dark:hover:bg-[#d9ba78]/16"
+            >
+              <MessageSquareText className="h-4 w-4" />
+              生成 JD 匹配报告
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 trackEvent('ai_cta_click', { source: 'hero' });
-                openRecruiterAssistant();
+                openRecruiterAssistant('chat', 'hero_chat');
               }}
               className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-5 py-3 text-sm font-medium text-black transition-colors hover:border-black/20 hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:border-white/20"
             >
@@ -267,6 +282,91 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section id="skill-lab" className="mx-auto mt-24 max-w-7xl scroll-mt-28">
+        <SectionHeader
+          eyebrow="Skill Lab"
+          title="把 Agent 能力封装成可复用的招聘 Skill"
+          body="不只展示“会聊天”，而是展示如何定义触发条件、输入输出、工具、Guardrails 与评估面，让面试官看到能力封装与工程判断。"
+        />
+
+        <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          {featuredSkills.map((skill) => (
+            <a
+              key={skill.slug}
+              href={`/skills#${skill.slug}`}
+              className="group rounded-[30px] border border-black/10 bg-white/72 p-6 shadow-[0_18px_70px_rgba(23,18,10,0.06)] transition-transform hover:-translate-y-1 dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_18px_70px_rgba(0,0,0,0.28)]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.18em] ${
+                    skill.status === 'live'
+                      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : 'border-[#d9ba78]/35 bg-[#f1e7d2]/70 text-[#7a5b2b] dark:border-[#d9ba78]/20 dark:bg-[#d9ba78]/10 dark:text-[#f0d9a0]'
+                  }`}
+                >
+                  {skill.kicker}
+                </span>
+                <ArrowUpRight className="h-4 w-4 text-black/35 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 dark:text-white/35" />
+              </div>
+
+              <h3 className="mt-5 text-2xl font-semibold tracking-tight text-black dark:text-white">
+                {skill.title}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-black/62 dark:text-white/62">
+                {skill.summary}
+              </p>
+
+              <div className="mt-6 grid gap-3">
+                <div className="rounded-2xl border border-black/8 bg-black/[0.03] px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
+                    <FileSearch className="h-3.5 w-3.5" />
+                    Inputs / Outputs
+                  </div>
+                  <div className="mt-3 text-sm leading-relaxed text-black/70 dark:text-white/70">
+                    {skill.inputs.slice(0, 2).join(' / ')} → {skill.outputs.slice(0, 2).join(' / ')}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-black/8 bg-black/[0.03] px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Guardrail
+                  </div>
+                  <div className="mt-3 text-sm leading-relaxed text-black/70 dark:text-white/70">
+                    {skill.guardrails[0]}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-between gap-3 text-sm text-black/55 dark:text-white/55">
+                <span>{skill.version}</span>
+                <span>{skill.evals[0]?.label}: {skill.evals[0]?.value}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <a
+            href="/skills"
+            className="inline-flex items-center gap-2 rounded-full border border-black/10 px-5 py-3 text-sm font-medium text-black transition-colors hover:border-black/20 hover:bg-black/4 dark:border-white/10 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/6"
+          >
+            查看 Skill Lab
+            <ArrowRight className="h-4 w-4" />
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              trackEvent('jd_fit_cta_click', { source: 'skill_lab' });
+              openRecruiterAssistant('jd-fit', 'skill_lab_jd_fit');
+            }}
+            className="inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5 dark:bg-white dark:text-black"
+          >
+            <MessageSquareText className="h-4 w-4" />
+            直接体验 Live Skill
+          </button>
+        </div>
+      </section>
+
       <section id="cases" className="mx-auto mt-24 max-w-7xl scroll-mt-28">
         <SectionHeader
           eyebrow="精选案例"
@@ -330,9 +430,10 @@ export default function HomePage() {
               工作经历
             </div>
             <div className="space-y-4">
-              {workEntries.map((entry) => (
+              {workEntries.map((entry, index) => (
                 <div
                   key={`${entry.period}-${entry.organization}`}
+                  id={`timeline-work-${index}`}
                   className="rounded-[28px] border border-black/10 bg-white/75 p-6 dark:border-white/10 dark:bg-white/[0.05]"
                 >
                   <div className="text-xs uppercase tracking-[0.2em] text-black/42 dark:text-white/42">
@@ -367,9 +468,10 @@ export default function HomePage() {
               教育与荣誉
             </div>
             <div className="space-y-4">
-              {educationEntries.map((entry) => (
+              {educationEntries.map((entry, index) => (
                 <div
                   key={`${entry.period}-${entry.organization}`}
+                  id={`timeline-education-${index}`}
                   className="rounded-[28px] border border-black/10 bg-white/75 p-6 dark:border-white/10 dark:bg-white/[0.05]"
                 >
                   <div className="text-xs uppercase tracking-[0.2em] text-black/42 dark:text-white/42">

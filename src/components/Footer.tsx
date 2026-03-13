@@ -13,6 +13,9 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
+          <a href="/skills" className="transition-colors hover:text-black dark:hover:text-white">
+            Skill Lab
+          </a>
           <a
             href={profile.github}
             target="_blank"

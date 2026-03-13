@@ -26,6 +26,39 @@ export type SkillGroup = {
   items: string[];
 };
 
+export type SkillStatus = 'live' | 'prototype';
+
+export type SkillStep = {
+  title: string;
+  detail: string;
+};
+
+export type SkillMetric = {
+  label: string;
+  value: string;
+  detail: string;
+};
+
+export type SkillEntry = {
+  slug: string;
+  title: string;
+  kicker: string;
+  status: SkillStatus;
+  version: string;
+  summary: string;
+  goal: string;
+  proof: string;
+  trigger: string[];
+  inputs: string[];
+  tools: string[];
+  outputs: string[];
+  guardrails: string[];
+  runtimeSteps: SkillStep[];
+  evals: SkillMetric[];
+  relatedProjectSlugs: string[];
+  relatedNoteSlugs: string[];
+};
+
 export type SeoMeta = {
   title: string;
   description: string;
@@ -114,6 +147,7 @@ export type Profile = {
 
 export type RouteInfo =
   | { kind: 'home'; pathname: '/'; seo: SeoMeta; profile: Profile }
+  | { kind: 'skills'; pathname: '/skills'; seo: SeoMeta; skills: SkillEntry[] }
   | { kind: 'project'; pathname: string; seo: SeoMeta; project: ProjectEntry }
   | { kind: 'note'; pathname: string; seo: SeoMeta; note: NoteEntry }
   | { kind: 'notFound'; pathname: string; seo: SeoMeta };

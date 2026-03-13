@@ -17,12 +17,13 @@ export default function SiteHeader({ route }: SiteHeaderProps) {
     () =>
       [
         { label: '案例', href: isHome ? '#cases' : '/#cases' },
-        { label: '技能', href: isHome ? '#skills' : '/#skills' },
+        { label: '能力', href: isHome ? '#skills' : '/#skills' },
+        { label: 'Skill Lab', href: route.kind === 'skills' ? '#skill-catalog' : '/skills' },
         { label: '经历', href: isHome ? '#timeline' : '/#timeline' },
         { label: '笔记', href: isHome ? '#notes' : '/#notes' },
         { label: '联系', href: isHome ? '#contact' : '/#contact' },
       ],
-    [isHome],
+    [isHome, route.kind],
   );
 
   useEffect(() => {

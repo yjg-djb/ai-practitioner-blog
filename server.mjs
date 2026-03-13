@@ -11,6 +11,7 @@ import {
   getSitemapEntries,
   normalizeSiteUrl,
 } from './src/content/siteContent.js';
+import { generateJdFitReport } from './src/server/recruiterReport.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +32,7 @@ const port = Number.parseInt(process.env.PORT || '3000', 10);
 const proxyBasePath = (process.env.VITE_OPENAI_API_BASE || '/api/openai').trim().replace(/\/+$/, '');
 const upstreamBaseUrl = (process.env.OPENAI_COMPAT_BASE_URL || '').trim().replace(/\/+$/, '');
 const upstreamApiKey = (process.env.OPENAI_COMPAT_API_KEY || '').trim();
+const defaultModel = (process.env.VITE_OPENAI_MODEL || 'qwen3.5-plus').trim();
 
 const mimeTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -71,6 +73,10 @@ const server = createServer(async (request, response) => {
 
     if (requestUrl.pathname === '/sitemap.xml') {
       return sendText(response, 200, renderSitemapXml(resolveSiteUrl(request)), 'application/xml; charset=utf-8');
+    }
+
+    if (requestUrl.pathname === '/api/recruiter/jd-fit' && request.method === 'POST') {
+      return handleRecruiterJdFit(request, response);
     }
 
     if (requestUrl.pathname === proxyBasePath || requestUrl.pathname.startsWith(`${proxyBasePath}/`)) {
@@ -155,6 +161,27 @@ async function proxyRequest(request, response, requestUrl) {
   } finally {
     request.off('aborted', abortUpstreamRequest);
     response.off('close', abortUpstreamRequest);
+  }
+}
+
+async function handleRecruiterJdFit(request, response) {
+  try {
+    const payload = await readJsonRequest(request);
+    const report = await generateJdFitReport({
+      upstreamBaseUrl,
+      upstreamApiKey,
+      model: typeof payload.model === 'string' && payload.model.trim() ? payload.model.trim() : defaultModel,
+      jobText: payload.jobText,
+      jobUrl: payload.jobUrl,
+    });
+
+    return sendJson(response, 200, report);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'JD 匹配报告生成失败。';
+    const statusCode =
+      /请至少提供岗位链接或 JD 文本|岗位链接|请求体不是有效 JSON/.test(message) ? 400 : 500;
+
+    return sendJson(response, statusCode, { error: message });
   }
 }
 
@@ -310,6 +337,20 @@ async function readRequestBody(request) {
   }
 
   return Buffer.concat(chunks);
+}
+
+async function readJsonRequest(request) {
+  const rawBody = await readRequestBody(request);
+
+  if (rawBody.length === 0) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(rawBody.toString('utf8'));
+  } catch {
+    throw new Error('请求体不是有效 JSON。');
+  }
 }
 
 async function pipeResponseBody(body, response, abortController) {
